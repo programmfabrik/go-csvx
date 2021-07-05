@@ -99,14 +99,14 @@ func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 		}
 
 		headerInfo = c.extractHeaderInformations([2][]string{records[0], records[1]})
-		records = records[1:]
+		records = records[2:]
 	} else {
 		if len(records) < 1 {
 			return nil, ErrDataIsNil
 		}
 
 		headerInfo = c.extractHeaderInformations([2][]string{records[0]})
-		records = records[0:]
+		records = records[1:]
 	}
 
 	return c.csvToMap(headerInfo, records)
@@ -136,7 +136,7 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 	rslt := []map[string]interface{}{}
 
 	// skip first row
-	for _, value := range records[1:] {
+	for _, value := range records {
 		myColumn := make(map[string]interface{})
 		for idx, v2 := range value {
 			if len(headerInfo) < idx {
