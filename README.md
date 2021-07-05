@@ -1,5 +1,7 @@
 # go-csvx
 
+[![unit-tests](https://github.com/programmfabrik/go-csvx/actions/workflows/tests.yml/badge.svg)](https://github.com/programmfabrik/go-csvx/actions/workflows/tests.yml)
+
 go-csvx implements the csv encoder and extends it with various functionalities. This library supports a typed csv format. The second column defines the data type.
 
 ## Getting started
