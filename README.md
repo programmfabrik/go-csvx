@@ -29,7 +29,7 @@ foo,bar,counter,names
 hello,world,10,"hello,world,how,is,it,going"
 ```
 
-## Supported datatypes
+## Supported data types
 
 This library supports the following list of data types:
 
