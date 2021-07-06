@@ -1,0 +1,20 @@
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+release:
+  draft: true
+  prerelease: auto
+  name_template: "Release-{{.Tag}}"
+
+checksum:
+  disable: true
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^typo:'
