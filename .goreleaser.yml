@@ -1,0 +1,29 @@
+before:
+  hooks:
+    - go get ./...
+
+builds:
+  - id: skip-build
+    skip: true
+
+release:
+  draft: true
+  prerelease: auto
+  name_template: "Release-{{.Tag}}"
+
+checksum:
+  disable: true
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^typo:'
+      - '^ci:'
+      - '^cd:'
+      - '^ci/cd:'

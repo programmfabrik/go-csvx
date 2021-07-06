@@ -1,0 +1,38 @@
+name: unit-tests
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  unit-tests:
+    name: test the go code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: run go 1.16
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.16
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: execute tests
+        shell: bash
+        run: |
+          go test -race -cover ./...
+
+      - name: Notify slack channel about failed unit tests
+        if: ${{ failure() }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.K8S_DEPLOYMENT_SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: github-fylr
+          SLACK_USERNAME: fylr-bot
+          SLACK_ICON: https://avatars.githubusercontent.com/u/1220228?s=200&v=4
+          SLACK_COLOR: "#ff0000"
+          SLACK_MESSAGE: ${{ github.event.head_commit.message }}
+          SLACK_TITLE: go-csvx unit tests failed
+          SLACK_FOOTER: ""
