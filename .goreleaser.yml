@@ -1,7 +1,10 @@
 before:
   hooks:
-    # You may remove this if you don't use go modules.
-    - go mod tidy
+    - go get ./...
+
+builds:
+  - id: skip-build
+    skip: true
 
 release:
   draft: true
@@ -11,6 +14,9 @@ release:
 checksum:
   disable: true
 
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
 changelog:
   sort: asc
   filters:
@@ -18,3 +24,6 @@ changelog:
       - '^docs:'
       - '^test:'
       - '^typo:'
+      - '^ci:'
+      - '^cd:'
+      - '^ci/cd:'
