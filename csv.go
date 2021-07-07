@@ -29,7 +29,8 @@ type CSV struct {
 	comma, comment   rune
 	trimLeadingSpace bool
 
-	isTyped bool
+	skipEmptyColumns bool
+	isTyped          bool
 }
 
 func NewCSV(comma, comment rune, trimLeadingSpace bool) *CSV {
@@ -38,6 +39,13 @@ func NewCSV(comma, comment rune, trimLeadingSpace bool) *CSV {
 		comment:          comment,
 		trimLeadingSpace: trimLeadingSpace,
 	}
+}
+
+// WithSkipEmptyTypeColumn defines whether empty type columns should be skipped or not.
+// This takes effect only if the Csv contains type information in the second column.
+func (c *CSV) WithSkipEmptyTypeColumn(skip bool) *CSV {
+	c.skipEmptyColumns = skip
+	return c
 }
 
 // ToMap unmarshals the data into a slice of map[string]interface{}
@@ -70,6 +78,7 @@ func (c *CSV) checkForNilOrDefault() {
 	}
 }
 
+// readCSV delegates the read command to csv.NewReader (stdlib) and writes it to a two-dimensional string slice that is returned.
 func (c *CSV) readCSV(data []byte) ([][]string, error) {
 	csvR := csv.NewReader(bytes.NewReader(data))
 	csvR.Comma = c.comma
@@ -98,31 +107,33 @@ func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 			return nil, ErrDataIsNil
 		}
 
-		headerInfo = c.extractHeaderInformations([2][]string{records[0], records[1]})
+		headerInfo = c.extractHeaderInformation(records[0], records[1])
 		records = records[2:]
 	} else {
 		if len(records) < 1 {
 			return nil, ErrDataIsNil
 		}
 
-		headerInfo = c.extractHeaderInformations([2][]string{records[0]})
+		headerInfo = c.extractHeaderInformation(records[0], nil)
 		records = records[1:]
 	}
 
 	return c.csvToMap(headerInfo, records)
 }
 
-// extractHeaderInformations reads the header information and returns it as map of field
-func (c *CSV) extractHeaderInformations(data [2][]string) map[int]field {
+// extractHeaderInformation reads the header information and returns it as map of field
+func (c *CSV) extractHeaderInformation(names, types []string) map[int]field {
 	headFields := map[int]field{}
 
-	for idx, value := range data[0] {
+	// extract field names
+	for idx, value := range names {
 		headFields[idx] = field{
 			Name: value,
 		}
 	}
 
-	for idx, value := range data[1] {
+	// extract field types
+	for idx, value := range types {
 		field := headFields[idx]
 		field.Type = value
 		headFields[idx] = field
@@ -131,12 +142,14 @@ func (c *CSV) extractHeaderInformations(data [2][]string) map[int]field {
 	return headFields
 }
 
-// csvToMap build the data columns based on the typed or untyped fields
+// csvToMap builds the data columns based on the typed or untyped fields
 func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[string]interface{}, error) {
 	rslt := []map[string]interface{}{}
 
 	// skip first row
 	for _, value := range records {
+		skipColumn := true
+
 		myColumn := make(map[string]interface{})
 		for idx, v2 := range value {
 			if len(headerInfo) < idx {
@@ -144,20 +157,43 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 				break
 			}
 
-			// is typed
+			// check whether v2 contains a value or not
+			// set skip column to false, if a value was set
+			if len(v2) > 0 {
+				skipColumn = false
+			}
+
+			// check whether isTyped is true, the header info is not set and skip columns is set
+			// then this row should be skipped
+			if c.isTyped && headerInfo[idx].Type == "" && c.skipEmptyColumns {
+				continue
+			}
+
+			// check whether the type was set for the row
 			if headerInfo[idx].Type != "" {
-				// is typed
-				typed, err := c.toTyped(v2, headerInfo[idx].Type)
+				// toTyped returns the
+				typed, err := c.toTyped(v2, strings.TrimPrefix(headerInfo[idx].Type, "*"))
 				if err != nil {
 					return nil, err
 				}
+
+				// check whether the type field was prefixed with a pointer
+				if strings.HasPrefix(headerInfo[idx].Type, "*") {
+					// type is a pointer
+					myColumn[headerInfo[idx].Name] = &typed
+					continue
+				}
+
+				// type is not a pointer
 				myColumn[headerInfo[idx].Name] = typed
 				continue
 			}
 
 			myColumn[headerInfo[idx].Name] = v2
 		}
-		rslt = append(rslt, myColumn)
+		if !skipColumn {
+			rslt = append(rslt, myColumn)
+		}
 	}
 
 	return rslt, nil

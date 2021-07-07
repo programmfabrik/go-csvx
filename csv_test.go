@@ -39,9 +39,10 @@ func TestNewCSV(t *testing.T) {
 	}
 }
 
-func TestToMap(t *testing.T) {
+func TestCSV_ToMap(t *testing.T) {
 	type args struct {
-		data []byte
+		data          []byte
+		withSkipEmpty bool
 	}
 	tests := []struct {
 		name    string
@@ -52,7 +53,10 @@ func TestToMap(t *testing.T) {
 		{
 			name: "test_untyped_1",
 			args: args{
-				data: []byte("foo,bar\nfirst,second"),
+				data: []byte(`
+				foo,bar
+				first,second`),
+				withSkipEmpty: false,
 			},
 			want: []map[string]interface{}{
 				{
@@ -65,7 +69,11 @@ func TestToMap(t *testing.T) {
 		{
 			name: "test_untyped_2",
 			args: args{
-				data: []byte("foo,bar\nfirst,second\nthird,fourth"),
+				data: []byte(`
+				foo,bar
+				first,second
+				third,fourth`),
+				withSkipEmpty: false,
 			},
 			want: []map[string]interface{}{
 				{
@@ -79,11 +87,55 @@ func TestToMap(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "test_untyped_with_empty_column",
+			args: args{
+				data: []byte(`foo,bar
+				,
+				first,second
+				third,fourth`),
+				withSkipEmpty: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": "second",
+				},
+				{
+					"foo": "third",
+					"bar": "fourth",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_untyped_with_empty_column_row",
+			args: args{
+				data: []byte(`foo,placeholder,bar
+				,,
+				first,,second
+				third,,fourth`),
+				withSkipEmpty: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo":         "first",
+					"placeholder": "",
+					"bar":         "second",
+				},
+				{
+					"foo":         "third",
+					"placeholder": "",
+					"bar":         "fourth",
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := NewCSV(',', '#', true).WithSkipEmptyTypeColumn(tt.args.withSkipEmpty)
 
 			rslt, err := csv.ToMap(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -97,9 +149,10 @@ func TestToMap(t *testing.T) {
 	}
 }
 
-func TestToTypedMap(t *testing.T) {
+func TestCSV_toTyped(t *testing.T) {
 	type args struct {
-		data []byte
+		data             []byte
+		skipEmptyColumns bool
 	}
 	tests := []struct {
 		name    string
@@ -110,7 +163,10 @@ func TestToTypedMap(t *testing.T) {
 		{
 			name: "test_typed_1",
 			args: args{
-				data: []byte("foo,bar\nstring,string\nfirst,second"),
+				data: []byte(`
+				foo,bar
+				string,string
+				first,second`),
 			},
 			want: []map[string]interface{}{
 				{
@@ -123,7 +179,11 @@ func TestToTypedMap(t *testing.T) {
 		{
 			name: "test_typed_2",
 			args: args{
-				data: []byte("foo,bar\nstring,string\nfirst,second\nthird,fourth"),
+				data: []byte(`
+				foo,bar
+				string,string
+				first,second
+				third,fourth`),
 			},
 			want: []map[string]interface{}{
 				{
@@ -140,7 +200,11 @@ func TestToTypedMap(t *testing.T) {
 		{
 			name: "test_typed_3",
 			args: args{
-				data: []byte("foo,bar\nstring,int64\nfirst,10\nthird,20"),
+				data: []byte(`
+				foo,bar
+				string,int64
+				first,10
+				third,20`),
 			},
 			want: []map[string]interface{}{
 				{
@@ -154,11 +218,46 @@ func TestToTypedMap(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "test_typed_empty_column",
+			args: args{
+				data: []byte(`
+				foo,bar
+				string,int64
+				,
+				first,10`),
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": int64(10),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_typed_empty_type_column",
+			args: args{
+				data: []byte(`
+				foo,placeholder,bar
+				string,,int64
+				,,
+				first,test,10`),
+				skipEmptyColumns: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": int64(10),
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := NewCSV(',', '#', true).WithSkipEmptyTypeColumn(tt.args.skipEmptyColumns)
 
 			rslt, err := csv.ToTypedMap(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -172,7 +271,7 @@ func TestToTypedMap(t *testing.T) {
 	}
 }
 
-func TestCheckForNilOrDefault(t *testing.T) {
+func TestCSV_checkForNilOrDefault(t *testing.T) {
 	type args struct {
 		csv *CSV
 	}
@@ -182,7 +281,7 @@ func TestCheckForNilOrDefault(t *testing.T) {
 		want *CSV
 	}{
 		{
-			name: "test_success_1",
+			name: "test_success_with_comma_and_comment",
 			args: args{
 				csv: &CSV{
 					comma:            ',',
@@ -197,7 +296,7 @@ func TestCheckForNilOrDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "test_success_2",
+			name: "test_success_with_comment",
 			args: args{
 				csv: &CSV{
 					comment:          '#',
@@ -211,7 +310,7 @@ func TestCheckForNilOrDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "test_success_3",
+			name: "test_success_with_comma",
 			args: args{
 				csv: &CSV{
 					comma:            ',',
@@ -225,7 +324,7 @@ func TestCheckForNilOrDefault(t *testing.T) {
 			},
 		},
 		{
-			name: "test_success_4",
+			name: "test_success_without_comma_and_comment",
 			args: args{
 				csv: &CSV{
 					trimLeadingSpace: true,
@@ -249,7 +348,7 @@ func TestCheckForNilOrDefault(t *testing.T) {
 	}
 }
 
-func TestReadCSV(t *testing.T) {
+func TestCSV_readCSV(t *testing.T) {
 	type args struct {
 		data []byte
 	}
@@ -260,12 +359,32 @@ func TestReadCSV(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "test_success",
+			name: "test_one_line",
 			args: args{
-				data: []byte("foo,bar"),
+				data: []byte(`foo,bar`),
 			},
 			want:    [][]string{{"foo", "bar"}},
 			wantErr: false,
+		},
+		{
+			name: "test_with_one_empty",
+			args: args{
+				data: []byte(`
+				foo,bar
+				,`),
+			},
+			want:    [][]string{{"foo", "bar"}, {"", ""}},
+			wantErr: false,
+		},
+		{
+			name: "test_with_one_clear",
+			args: args{
+				data: []byte(`
+				foo,bar
+				`),
+			},
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -284,7 +403,7 @@ func TestReadCSV(t *testing.T) {
 	}
 }
 
-func TestParseToCSV(t *testing.T) {
+func TestCSV_parseToCSV(t *testing.T) {
 	type args struct {
 		data    []byte
 		isTyped bool
@@ -298,7 +417,9 @@ func TestParseToCSV(t *testing.T) {
 		{
 			name: "test_untyped_1",
 			args: args{
-				data:    []byte("foo,bar\nfirst,second"),
+				data: []byte(`
+				foo,bar
+				first,second`),
 				isTyped: false,
 			},
 			want: []map[string]interface{}{
@@ -312,7 +433,10 @@ func TestParseToCSV(t *testing.T) {
 		{
 			name: "test_untyped_2",
 			args: args{
-				data:    []byte("foo,bar\nfirst,second\nthird,fourth"),
+				data: []byte(`
+				foo,bar
+				first,second
+				third,fourth`),
 				isTyped: false,
 			},
 			want: []map[string]interface{}{
@@ -331,7 +455,10 @@ func TestParseToCSV(t *testing.T) {
 		{
 			name: "test_typed_1",
 			args: args{
-				data:    []byte("foo,bar\nstring,string\nfirst,second"),
+				data: []byte(`
+				foo,bar
+				string,string
+				first,second`),
 				isTyped: true,
 			},
 			want: []map[string]interface{}{
@@ -345,7 +472,11 @@ func TestParseToCSV(t *testing.T) {
 		{
 			name: "test_typed_2",
 			args: args{
-				data:    []byte("foo,bar\nstring,string\nfirst,second\nthird,fourth"),
+				data: []byte(`
+				foo,bar
+				string,string
+				first,second
+				third,fourth`),
 				isTyped: true,
 			},
 			want: []map[string]interface{}{
@@ -356,6 +487,42 @@ func TestParseToCSV(t *testing.T) {
 				{
 					"foo": "third",
 					"bar": "fourth",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_typed_clear_column",
+			args: args{
+				data: []byte(`
+				foo,bar
+				string,string
+
+				first,second`),
+				isTyped: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": "second",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_typed_empty_column",
+			args: args{
+				data: []byte(`
+				foo,bar
+				string,string
+				,
+				first,second`),
+				isTyped: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": "second",
 				},
 			},
 			wantErr: false,
@@ -379,9 +546,10 @@ func TestParseToCSV(t *testing.T) {
 	}
 }
 
-func TestExtractHeaderInformations(t *testing.T) {
+func TestCSV_extractHeaderInformation(t *testing.T) {
 	type args struct {
-		data [2][]string
+		names []string
+		types []string
 	}
 	tests := []struct {
 		name string
@@ -391,7 +559,8 @@ func TestExtractHeaderInformations(t *testing.T) {
 		{
 			name: "test_success_untyped",
 			args: args{
-				data: [2][]string{{"foo", "bar"}},
+				names: []string{"foo", "bar"},
+				types: nil,
 			},
 			want: map[int]field{
 				0: {
@@ -405,9 +574,10 @@ func TestExtractHeaderInformations(t *testing.T) {
 			},
 		},
 		{
-			name: "test_success_typed_1",
+			name: "test_success_string_string",
 			args: args{
-				data: [2][]string{{"foo", "bar"}, {"string", "string"}},
+				names: []string{"foo", "bar"},
+				types: []string{"string", "string"},
 			},
 			want: map[int]field{
 				0: {
@@ -421,9 +591,10 @@ func TestExtractHeaderInformations(t *testing.T) {
 			},
 		},
 		{
-			name: "test_success_typed_2",
+			name: "test_success_string_int",
 			args: args{
-				data: [2][]string{{"foo", "bar"}, {"string", "int"}},
+				names: []string{"foo", "bar"},
+				types: []string{"string", "int"},
 			},
 			want: map[int]field{
 				0: {
@@ -436,12 +607,29 @@ func TestExtractHeaderInformations(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test_success_string_json",
+			args: args{
+				names: []string{"foo", "bar"},
+				types: []string{"string", "json"},
+			},
+			want: map[int]field{
+				0: {
+					Name: "foo",
+					Type: "string",
+				},
+				1: {
+					Name: "bar",
+					Type: "json",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			csv := NewCSV(',', '#', true)
 
-			rslt := csv.extractHeaderInformations(tt.args.data)
+			rslt := csv.extractHeaderInformation(tt.args.names, tt.args.types)
 
 			if !reflect.DeepEqual(rslt, tt.want) {
 				t.Errorf("TestExtractHeaderInformations() does not equal. got = %v, want = %v", rslt, tt.want)
@@ -450,7 +638,7 @@ func TestExtractHeaderInformations(t *testing.T) {
 	}
 }
 
-func TestCsvToMap(t *testing.T) {
+func TestCSV_csvToMap(t *testing.T) {
 	type args struct {
 		headerInfo map[int]field
 		records    [][]string
@@ -684,6 +872,16 @@ func TestToTyped(t *testing.T) {
 			want:    map[string]interface{}{"name": "value"},
 			wantErr: false,
 		},
+
+		{
+			name: "test_string_json",
+			args: args{
+				value:  `{"name": "value"}`,
+				format: "string,json",
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -696,6 +894,53 @@ func TestToTyped(t *testing.T) {
 
 			if !reflect.DeepEqual(rslt, tt.want) {
 				t.Errorf("TestToTyped() does not equal. got = %v, want = %v", rslt, tt.want)
+			}
+		})
+	}
+}
+
+func TestCSV_WithSkipEmptyTypeColumn(t *testing.T) {
+	type args struct {
+		skip bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want *CSV
+	}{
+		{
+			name: "with_true",
+			args: args{
+				skip: true,
+			},
+			want: &CSV{
+				skipEmptyColumns: true,
+			},
+		},
+		{
+			name: "with_false",
+			args: args{
+				skip: false,
+			},
+			want: &CSV{
+				skipEmptyColumns: false,
+			},
+		},
+		{
+			name: "with_default",
+			args: args{},
+			want: &CSV{
+				skipEmptyColumns: false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			csv := NewCSV(',', '#', true)
+			csv.WithSkipEmptyTypeColumn(tt.args.skip)
+
+			if !reflect.DeepEqual(csv.skipEmptyColumns, tt.want.skipEmptyColumns) {
+				t.Errorf("CSV.WithSkipEmptyTypeColumn() = %v, want %v", csv.skipEmptyColumns, tt.want.skipEmptyColumns)
 			}
 		})
 	}
