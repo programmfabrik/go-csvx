@@ -33,7 +33,7 @@ func TestNewCSV(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewCSV(tt.args.comma, tt.args.comment, tt.args.trimLeadingSpace)
 			if !reflect.DeepEqual(*got, *tt.want) {
-				t.Errorf("NewCSV() does not equal. got = %v, want = %v", *got, *tt.want)
+				t.Errorf("NewCSV() is not equal. got = %+#v, want = %+#v", *got, *tt.want)
 			}
 		})
 	}
@@ -94,7 +94,7 @@ func TestCSV_ToMap(t *testing.T) {
 				,
 				first,second
 				third,fourth`),
-				withSkipEmpty: true,
+				withSkipEmpty: false,
 			},
 			want: []map[string]interface{}{
 				{
@@ -115,7 +115,7 @@ func TestCSV_ToMap(t *testing.T) {
 				,,
 				first,,second
 				third,,fourth`),
-				withSkipEmpty: true,
+				withSkipEmpty: false,
 			},
 			want: []map[string]interface{}{
 				{
@@ -131,6 +131,51 @@ func TestCSV_ToMap(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "test_with_comment",
+			args: args{
+				data: []byte(`foo,bar
+				first,second
+				#third,fourth`),
+				withSkipEmpty: false,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": "second",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_with_comment_and_space",
+			args: args{
+				data: []byte(`foo,bar
+				first,second
+				# third,fourth`),
+				withSkipEmpty: false,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": "second",
+				},
+			},
+			wantErr: false,
+		},
+
+		{
+			name: "test_with_clear",
+			args: args{
+				data: []byte(`
+				foo,bar
+				
+				# third,fourth`),
+				withSkipEmpty: false,
+			},
+			want:    []map[string]interface{}{},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -143,13 +188,13 @@ func TestCSV_ToMap(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToMap() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestToMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}
 }
 
-func TestCSV_toTyped(t *testing.T) {
+func TestCSV_ToTypedMap(t *testing.T) {
 	type args struct {
 		data             []byte
 		skipEmptyColumns bool
@@ -219,6 +264,27 @@ func TestCSV_toTyped(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "test_typed_json",
+			args: args{
+				data: []byte(`
+				foo,bar,subtype
+				string,int,json
+				first,10,{"key": 10}`),
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": 10,
+					"subtype": map[string]interface{}{
+						"key": 10,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		// []map[string]interface {}{map[string]interface {}{"bar":10, "foo":"first", "subtype":map[string]interface {}{"key":10}}}
+		// []map[string]interface {}{map[string]interface {}{"bar":10, "foo":"first", "subtype":map[string]interface {}{"key":10}}}
+		{
 			name: "test_typed_empty_column",
 			args: args{
 				data: []byte(`
@@ -253,6 +319,24 @@ func TestCSV_toTyped(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "test_typed_clear",
+			args: args{
+				data: []byte(`
+				foo,placeholder,bar
+				string,,int64
+				
+				first,test,10`),
+				skipEmptyColumns: true,
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": "first",
+					"bar": int64(10),
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -265,7 +349,7 @@ func TestCSV_toTyped(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToTypedMap() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestToTypedMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -342,7 +426,7 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 			tt.args.csv.checkForNilOrDefault()
 
 			if !reflect.DeepEqual(*tt.args.csv, *tt.want) {
-				t.Errorf("TestCheckForNilOrDefault() does not equal. got = %v, want = %v", *tt.args.csv, *tt.want)
+				t.Errorf("TestCheckForNilOrDefault() is not equal. got = %+#v, want = %+#v", *tt.args.csv, *tt.want)
 			}
 		})
 	}
@@ -381,10 +465,11 @@ func TestCSV_readCSV(t *testing.T) {
 			args: args{
 				data: []byte(`
 				foo,bar
-				`),
+
+				first,second`),
 			},
-			want:    nil,
-			wantErr: true,
+			want:    [][]string{{"foo", "bar"}, {"first", "second"}},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -397,7 +482,7 @@ func TestCSV_readCSV(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(strS, tt.want) {
-				t.Errorf("TestReadCSV() does not equal. got = %v, want = %v", strS, tt.want)
+				t.Errorf("TestReadCSV() is not equal. got = %+#v, want = %+#v", strS, tt.want)
 			}
 		})
 	}
@@ -540,7 +625,7 @@ func TestCSV_parseToCSV(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestParseToCSV() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestParseToCSV() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -632,7 +717,7 @@ func TestCSV_extractHeaderInformation(t *testing.T) {
 			rslt := csv.extractHeaderInformation(tt.args.names, tt.args.types)
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestExtractHeaderInformations() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestExtractHeaderInformations() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -761,7 +846,7 @@ func TestCSV_csvToMap(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestCsvToMap() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestCsvToMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -893,7 +978,7 @@ func TestToTyped(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToTyped() does not equal. got = %v, want = %v", rslt, tt.want)
+				t.Errorf("TestToTyped() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
 			}
 		})
 	}

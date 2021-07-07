@@ -84,6 +84,8 @@ func (c *CSV) readCSV(data []byte) ([][]string, error) {
 	csvR.Comma = c.comma
 	csvR.Comment = c.comment
 	csvR.TrimLeadingSpace = c.trimLeadingSpace
+	csvR.FieldsPerRecord = -1
+	csvR.LazyQuotes = true
 
 	records, err := csvR.ReadAll()
 	if err != nil {
@@ -93,6 +95,7 @@ func (c *CSV) readCSV(data []byte) ([][]string, error) {
 	return records, nil
 }
 
+// parseToCSV extracts the header information from the byte slice and generates a map based on the format (typed or untyped).
 func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 	c.checkForNilOrDefault()
 
@@ -157,6 +160,16 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 				break
 			}
 
+			// checks if the first entry of the row and the first character of the string matches the comment character.
+			// If it matches, this row is skipped.
+			// This is necessary because csvR.ReadAll() ignores some cases that contain such a comment rune
+			if idx == 0 && len(v2) > 0 {
+				if rune(v2[0]) == c.comment {
+					// the column contains the comment rune, skip it
+					break
+				}
+			}
+
 			// check whether v2 contains a value or not
 			// set skip column to false, if a value was set
 			if len(v2) > 0 {
@@ -199,6 +212,7 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 	return rslt, nil
 }
 
+// toTyped takes the value and the format and converts the value into the desired format.
 func (c *CSV) toTyped(value, format string) (interface{}, error) {
 	switch format {
 	case "string":
