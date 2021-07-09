@@ -1,6 +1,7 @@
 package csvx
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -33,7 +34,7 @@ func TestNewCSV(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := NewCSV(tt.args.comma, tt.args.comment, tt.args.trimLeadingSpace)
 			if !reflect.DeepEqual(*got, *tt.want) {
-				t.Errorf("NewCSV() is not equal. got = %+#v, want = %+#v", *got, *tt.want)
+				t.Errorf("NewCSV() is not equal. \ngot = %+#v\nwant = %+#v", *got, *tt.want)
 			}
 		})
 	}
@@ -188,22 +189,10 @@ func TestCSV_ToMap(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestToMap() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
 			}
 		})
 	}
-}
-
-func ptrString(s string) *string {
-	return &s
-}
-
-func ptrMapStringInterface(m map[string]interface{}) *map[string]interface{} {
-	return &m
-}
-
-func ptrInt(i int) *int {
-	return &i
 }
 
 func TestCSV_ToTypedMap(t *testing.T) {
@@ -304,11 +293,13 @@ func TestCSV_ToTypedMap(t *testing.T) {
 			},
 			want: []map[string]interface{}{
 				{
-					"foo": ptrString("first"),
-					"bar": ptrInt(int(10)),
-					"subtype": ptrMapStringInterface(map[string]interface{}{
-						"key": float64(10),
-					}),
+					"foo": func(msg string) *string { return &msg }("first"),
+					"bar": func(i int) *int { return &i }(int(10)),
+					"subtype": func(str string) interface{} {
+						var data interface{}
+						_ = json.Unmarshal([]byte(str), &data)
+						return &data
+					}(`{"key": 10}`),
 				},
 			},
 			wantErr: false,
@@ -455,7 +446,7 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 			tt.args.csv.checkForNilOrDefault()
 
 			if !reflect.DeepEqual(*tt.args.csv, *tt.want) {
-				t.Errorf("TestCheckForNilOrDefault() is not equal. got = %+#v, want = %+#v", *tt.args.csv, *tt.want)
+				t.Errorf("TestCheckForNilOrDefault() is not equal. \ngot = %+#v\nwant = %+#v", *tt.args.csv, *tt.want)
 			}
 		})
 	}
@@ -511,7 +502,7 @@ func TestCSV_readCSV(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(strS, tt.want) {
-				t.Errorf("TestReadCSV() is not equal. got = %+#v, want = %+#v", strS, tt.want)
+				t.Errorf("TestReadCSV() is not equal. \ngot = %+#v\nwant = %+#v", strS, tt.want)
 			}
 		})
 	}
@@ -654,7 +645,7 @@ func TestCSV_parseToCSV(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestParseToCSV() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestParseToCSV() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -746,7 +737,7 @@ func TestCSV_extractHeaderInformation(t *testing.T) {
 			rslt := csv.extractHeaderInformation(tt.args.names, tt.args.types)
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestExtractHeaderInformations() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestExtractHeaderInformations() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -875,7 +866,7 @@ func TestCSV_csvToMap(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestCsvToMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestCsvToMap() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -884,6 +875,7 @@ func TestCSV_csvToMap(t *testing.T) {
 func TestToTyped(t *testing.T) {
 	type args struct {
 		value, format string
+		isPointerType bool
 	}
 	tests := []struct {
 		name    string
@@ -894,8 +886,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_string",
 			args: args{
-				value:  "hello",
-				format: "string",
+				value:         "hello",
+				format:        "string",
+				isPointerType: false,
 			},
 			want:    "hello",
 			wantErr: false,
@@ -903,8 +896,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_string_array",
 			args: args{
-				value:  "hello,world",
-				format: "string,array",
+				value:         "hello,world",
+				format:        "string,array",
+				isPointerType: false,
 			},
 			want:    []string{"hello", "world"},
 			wantErr: false,
@@ -913,8 +907,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_bool",
 			args: args{
-				value:  "false",
-				format: "bool",
+				value:         "false",
+				format:        "bool",
+				isPointerType: false,
 			},
 			want:    false,
 			wantErr: false,
@@ -922,8 +917,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_bool_array",
 			args: args{
-				value:  "false,false",
-				format: "bool,array",
+				value:         "false,false",
+				format:        "bool,array",
+				isPointerType: false,
 			},
 			want:    []bool{false, false},
 			wantErr: false,
@@ -932,8 +928,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_int",
 			args: args{
-				value:  "10",
-				format: "int",
+				value:         "10",
+				format:        "int",
+				isPointerType: false,
 			},
 			want:    10,
 			wantErr: false,
@@ -942,8 +939,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_int64",
 			args: args{
-				value:  "10",
-				format: "int64",
+				value:         "10",
+				format:        "int64",
+				isPointerType: false,
 			},
 			want:    int64(10),
 			wantErr: false,
@@ -951,8 +949,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_int64_array",
 			args: args{
-				value:  "10,11",
-				format: "int64,array",
+				value:         "10,11",
+				format:        "int64,array",
+				isPointerType: false,
 			},
 			want:    []int64{10, 11},
 			wantErr: false,
@@ -961,8 +960,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_float64",
 			args: args{
-				value:  "10.1",
-				format: "float64",
+				value:         "10.1",
+				format:        "float64",
+				isPointerType: false,
 			},
 			want:    float64(10.1),
 			wantErr: false,
@@ -970,8 +970,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_float64_array",
 			args: args{
-				value:  "10.1,11.4",
-				format: "float64,array",
+				value:         "10.1,11.4",
+				format:        "float64,array",
+				isPointerType: false,
 			},
 			want:    []float64{10.1, 11.4},
 			wantErr: false,
@@ -980,8 +981,9 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_json",
 			args: args{
-				value:  `{"name": "value"}`,
-				format: "json",
+				value:         `{"name": "value"}`,
+				format:        "json",
+				isPointerType: false,
 			},
 			want:    map[string]interface{}{"name": "value"},
 			wantErr: false,
@@ -990,8 +992,142 @@ func TestToTyped(t *testing.T) {
 		{
 			name: "test_string_json",
 			args: args{
-				value:  `{"name": "value"}`,
-				format: "string,json",
+				value:         `{"name": "value"}`,
+				format:        "string,json",
+				isPointerType: false,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+
+		// pointer
+
+		{
+			name: "test_string_ptr",
+			args: args{
+				value:         "hello",
+				format:        "string",
+				isPointerType: true,
+			},
+			want: func(i string) *string {
+				return &i
+			}("hello"),
+			wantErr: false,
+		},
+		{
+			name: "test_string_array_ptr",
+			args: args{
+				value:         "hello,world",
+				format:        "string,array",
+				isPointerType: true,
+			},
+			want:    &[]string{"hello", "world"},
+			wantErr: false,
+		},
+
+		{
+			name: "test_bool_ptr",
+			args: args{
+				value:         "false",
+				format:        "bool",
+				isPointerType: true,
+			},
+			want: func(i bool) *bool {
+				return &i
+			}(false),
+			wantErr: false,
+		},
+		{
+			name: "test_bool_array_ptr",
+			args: args{
+				value:         "false,false",
+				format:        "bool,array",
+				isPointerType: true,
+			},
+			want:    &[]bool{false, false},
+			wantErr: false,
+		},
+
+		{
+			name: "test_int_ptr",
+			args: args{
+				value:         "10",
+				format:        "int",
+				isPointerType: true,
+			},
+			want: func(i int) *int {
+				return &i
+			}(10),
+			wantErr: false,
+		},
+
+		{
+			name: "test_int64_ptr",
+			args: args{
+				value:         "10",
+				format:        "int64",
+				isPointerType: true,
+			},
+			want: func(i int64) *int64 {
+				return &i
+			}(10),
+			wantErr: false,
+		},
+		{
+			name: "test_int64_array_ptr",
+			args: args{
+				value:         "10,11",
+				format:        "int64,array",
+				isPointerType: true,
+			},
+			want:    &[]int64{10, 11},
+			wantErr: false,
+		},
+
+		{
+			name: "test_float64_ptr",
+			args: args{
+				value:         "10.1",
+				format:        "float64",
+				isPointerType: true,
+			},
+			want: func(i float64) *float64 {
+				return &i
+			}(10.1),
+			wantErr: false,
+		},
+		{
+			name: "test_float64_array_ptr",
+			args: args{
+				value:         "10.1,11.4",
+				format:        "float64,array",
+				isPointerType: true,
+			},
+			want:    &[]float64{10.1, 11.4},
+			wantErr: false,
+		},
+
+		{
+			name: "test_json_ptr",
+			args: args{
+				value:         `{"name": "value"}`,
+				format:        "json",
+				isPointerType: true,
+			},
+			want: func(str string) interface{} {
+				var data interface{}
+				_ = json.Unmarshal([]byte(str), &data)
+				return &data
+			}(`{"name": "value"}`),
+			wantErr: false,
+		},
+
+		{
+			name: "test_prt_string_json",
+			args: args{
+				value:         `value,{"name": "value"}`,
+				format:        "string,json",
+				isPointerType: true,
 			},
 			want:    nil,
 			wantErr: true,
@@ -1001,13 +1137,13 @@ func TestToTyped(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			csv := NewCSV(',', '#', true)
 
-			rslt, err := csv.toTyped(tt.args.value, tt.args.format)
+			rslt, err := csv.toTyped(tt.args.value, tt.args.format, tt.args.isPointerType)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestToTyped() received error = %v", err)
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToTyped() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestToTyped() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
 			}
 		})
 	}
@@ -1054,7 +1190,7 @@ func TestCSV_WithSkipEmptyTypeColumn(t *testing.T) {
 			csv.WithSkipEmptyTypeColumn(tt.args.skip)
 
 			if !reflect.DeepEqual(csv.skipEmptyColumns, tt.want.skipEmptyColumns) {
-				t.Errorf("CSV.WithSkipEmptyTypeColumn() = %v, want %v", csv.skipEmptyColumns, tt.want.skipEmptyColumns)
+				t.Errorf("CSV.WithSkipEmptyTypeColumn() is not equal.\ngot = %v\nwant %v", csv.skipEmptyColumns, tt.want.skipEmptyColumns)
 			}
 		})
 	}

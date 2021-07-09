@@ -185,16 +185,9 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 			// check whether the type was set for the row
 			if headerInfo[idx].Type != "" {
 				// toTyped returns the
-				typed, err := c.toTyped(v2, strings.TrimPrefix(headerInfo[idx].Type, "*"))
+				typed, err := c.toTyped(v2, strings.TrimPrefix(headerInfo[idx].Type, "*"), strings.HasPrefix(headerInfo[idx].Type, "*"))
 				if err != nil {
 					return nil, err
-				}
-
-				// check whether the type field was prefixed with a pointer
-				if strings.HasPrefix(headerInfo[idx].Type, "*") {
-					// type is a pointer
-					myColumn[headerInfo[idx].Name] = &typed
-					continue
 				}
 
 				// type is not a pointer
@@ -213,33 +206,75 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 }
 
 // toTyped takes the value and the format and converts the value into the desired format.
-func (c *CSV) toTyped(value, format string) (interface{}, error) {
+func (c *CSV) toTyped(value, format string, isPointer bool) (interface{}, error) {
 	switch format {
 	case "string":
+		if value == "" && !isPointer {
+			return "", nil
+		} else if value == "" && isPointer {
+			return nil, nil
+		}
+
+		if isPointer {
+			return &value, nil
+		}
+
 		return value, nil
 	case "int64":
-		if value == "" {
+		if value == "" && !isPointer {
 			return int64(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseInt(value, 10, 64)
+
+		val, err := strconv.ParseInt(value, 10, 64)
+		if isPointer {
+			return &val, err
+		}
+
+		return val, err
 	case "int":
-		if value == "" {
+		if value == "" && !isPointer {
 			return int(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.Atoi(value)
+
+		val, err := strconv.Atoi(value)
+		if isPointer {
+			return &val, err
+		}
+
+		return val, err
 	case "float64":
-		if value == "" {
+		if value == "" && !isPointer {
 			return float64(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseFloat(value, 64)
+
+		val, err := strconv.ParseFloat(value, 64)
+		if isPointer {
+			return &val, err
+		}
+		return val, err
 	case "bool":
-		if value == "" {
+		if value == "" && !isPointer {
 			return false, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseBool(value)
+
+		val, err := strconv.ParseBool(value)
+		if isPointer {
+			return &val, err
+		}
+		return val, err
 	case "string,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []string{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -255,10 +290,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 
 		retArray := make([]string, 0)
 		retArray = append(retArray, records[0]...)
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "int64,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []int64{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -282,10 +324,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 			}
 			retArray = append(retArray, vi)
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "float64,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []float64{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -310,10 +359,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 			}
 			retArray = append(retArray, vi)
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "bool,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []bool{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -330,16 +386,27 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 		for _, v := range records[0] {
 			retArray = append(retArray, strings.TrimSpace(v) == "true")
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "json":
 		if value == "" {
 			return nil, nil
 		}
+
 		var data interface{}
 		err := json.Unmarshal([]byte(value), &data)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInEmbeddedJSON, err)
 		}
+
+		if isPointer {
+			return &data, nil
+		}
+
 		return data, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedType, format)
