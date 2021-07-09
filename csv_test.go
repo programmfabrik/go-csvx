@@ -194,6 +194,18 @@ func TestCSV_ToMap(t *testing.T) {
 	}
 }
 
+func ptrString(s string) *string {
+	return &s
+}
+
+func ptrMapStringInterface(m map[string]interface{}) *map[string]interface{} {
+	return &m
+}
+
+func ptrInt(i int) *int {
+	return &i
+}
+
 func TestCSV_ToTypedMap(t *testing.T) {
 	type args struct {
 		data             []byte
@@ -278,6 +290,25 @@ func TestCSV_ToTypedMap(t *testing.T) {
 					"subtype": map[string]interface{}{
 						"key": float64(10),
 					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "test_typed_json_ptr",
+			args: args{
+				data: []byte(`
+				foo,bar,subtype
+				*string,*int,*json
+				first,10,{"key": 10}`),
+			},
+			want: []map[string]interface{}{
+				{
+					"foo": ptrString("first"),
+					"bar": ptrInt(int(10)),
+					"subtype": ptrMapStringInterface(map[string]interface{}{
+						"key": float64(10),
+					}),
 				},
 			},
 			wantErr: false,
