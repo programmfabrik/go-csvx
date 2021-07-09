@@ -26,38 +26,29 @@ type field struct {
 }
 
 type CSV struct {
-	comma, comment   rune
-	trimLeadingSpace bool
-
-	skipEmptyColumns bool
-	isTyped          bool
+	// Comma defines the rune with which the entries in the csv file are separated from each other.
+	Comma rune
+	// Comment defines the rune used to mark comment strings within the CSV.
+	// If the line starts with this rune, the whole line is ignored.
+	Comment rune
+	// TrimLeadingSpace specifies whether leading spaces should be trimmed or not.
+	TrimLeadingSpace bool
+	// SkipEmptyColumns defines whether empty rows should be ignored or not.
+	SkipEmptyColumns bool
+	// isTyped defines whether the user expected to receive a typed or untyped response.
+	isTyped bool
 }
 
-func NewCSV(comma, comment rune, trimLeadingSpace bool) *CSV {
-	return &CSV{
-		comma:            comma,
-		comment:          comment,
-		trimLeadingSpace: trimLeadingSpace,
-	}
-}
-
-// WithSkipEmptyTypeColumn defines whether empty type columns should be skipped or not.
-// This takes effect only if the Csv contains type information in the second column.
-func (c *CSV) WithSkipEmptyTypeColumn(skip bool) *CSV {
-	c.skipEmptyColumns = skip
-	return c
-}
-
-// ToMap unmarshals the data into a slice of map[string]interface{}
-func (c *CSV) ToMap(data []byte) ([]map[string]interface{}, error) {
+// Untyped unmarshals the data into a slice of map[string]interface{}
+func (c *CSV) Untyped(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = false
 	return c.parseToCSV(data)
 }
 
-// ToTypedMap unmarshals the typed data into a slice of map[string]interface{}
+// Typed unmarshals the typed data into a slice of map[string]interface{}
 //
 // In this case, the second column of the csv must contain the field types, otherwise it will throw an error
-func (c *CSV) ToTypedMap(data []byte) ([]map[string]interface{}, error) {
+func (c *CSV) Typed(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = true
 	return c.parseToCSV(data)
 }
@@ -69,21 +60,21 @@ func (c *CSV) ToTypedMap(data []byte) ([]map[string]interface{}, error) {
 //  comma: ','
 //  comment: '#'
 func (c *CSV) checkForNilOrDefault() {
-	if c.comma == *new(rune) {
-		c.comma = ','
+	if c.Comma == *new(rune) {
+		c.Comma = ','
 	}
 
-	if c.comment == *new(rune) {
-		c.comment = '#'
+	if c.Comment == *new(rune) {
+		c.Comment = '#'
 	}
 }
 
 // readCSV delegates the read command to csv.NewReader (stdlib) and writes it to a two-dimensional string slice that is returned.
 func (c *CSV) readCSV(data []byte) ([][]string, error) {
 	csvR := csv.NewReader(bytes.NewReader(data))
-	csvR.Comma = c.comma
-	csvR.Comment = c.comment
-	csvR.TrimLeadingSpace = c.trimLeadingSpace
+	csvR.Comma = c.Comma
+	csvR.Comment = c.Comment
+	csvR.TrimLeadingSpace = c.TrimLeadingSpace
 	csvR.FieldsPerRecord = -1
 	csvR.LazyQuotes = true
 
@@ -164,7 +155,7 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 			// If it matches, this row is skipped.
 			// This is necessary because csvR.ReadAll() ignores some cases that contain such a comment rune
 			if idx == 0 && len(v2) > 0 {
-				if rune(v2[0]) == c.comment {
+				if rune(v2[0]) == c.Comment {
 					// the column contains the comment rune, skip it
 					break
 				}
@@ -178,7 +169,7 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 
 			// check whether isTyped is true, the header info is not set and skip columns is set
 			// then this row should be skipped
-			if c.isTyped && headerInfo[idx].Type == "" && c.skipEmptyColumns {
+			if c.isTyped && headerInfo[idx].Type == "" && c.SkipEmptyColumns {
 				continue
 			}
 

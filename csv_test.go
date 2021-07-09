@@ -6,41 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewCSV(t *testing.T) {
-	type args struct {
-		comma, comment   rune
-		trimLeadingSpace bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want *CSV
-	}{
-		{
-			name: "test_success",
-			args: args{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
-			},
-			want: &CSV{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NewCSV(tt.args.comma, tt.args.comment, tt.args.trimLeadingSpace)
-			if !reflect.DeepEqual(*got, *tt.want) {
-				t.Errorf("NewCSV() is not equal. \ngot = %+#v\nwant = %+#v", *got, *tt.want)
-			}
-		})
-	}
-}
-
-func TestCSV_ToMap(t *testing.T) {
+func TestCSV_Untyped(t *testing.T) {
 	type args struct {
 		data          []byte
 		withSkipEmpty bool
@@ -181,9 +147,9 @@ func TestCSV_ToMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true).WithSkipEmptyTypeColumn(tt.args.withSkipEmpty)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.withSkipEmpty}
 
-			rslt, err := csv.ToMap(tt.args.data)
+			rslt, err := csv.Untyped(tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestToMap() received error = %v", err)
 			}
@@ -195,7 +161,7 @@ func TestCSV_ToMap(t *testing.T) {
 	}
 }
 
-func TestCSV_ToTypedMap(t *testing.T) {
+func TestCSV_Typed(t *testing.T) {
 	type args struct {
 		data             []byte
 		skipEmptyColumns bool
@@ -361,9 +327,9 @@ func TestCSV_ToTypedMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true).WithSkipEmptyTypeColumn(tt.args.skipEmptyColumns)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.skipEmptyColumns}
 
-			rslt, err := csv.ToTypedMap(tt.args.data)
+			rslt, err := csv.Typed(tt.args.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestToTypedMap() received error = %v", err)
 			}
@@ -388,56 +354,56 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 			name: "test_success_with_comma_and_comment",
 			args: args{
 				csv: &CSV{
-					comma:            ',',
-					comment:          '#',
-					trimLeadingSpace: true,
+					Comma:            ',',
+					Comment:          '#',
+					TrimLeadingSpace: true,
 				},
 			},
 			want: &CSV{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
+				Comma:            ',',
+				Comment:          '#',
+				TrimLeadingSpace: true,
 			},
 		},
 		{
 			name: "test_success_with_comment",
 			args: args{
 				csv: &CSV{
-					comment:          '#',
-					trimLeadingSpace: true,
+					Comment:          '#',
+					TrimLeadingSpace: true,
 				},
 			},
 			want: &CSV{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
+				Comma:            ',',
+				Comment:          '#',
+				TrimLeadingSpace: true,
 			},
 		},
 		{
 			name: "test_success_with_comma",
 			args: args{
 				csv: &CSV{
-					comma:            ',',
-					trimLeadingSpace: true,
+					Comma:            ',',
+					TrimLeadingSpace: true,
 				},
 			},
 			want: &CSV{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
+				Comma:            ',',
+				Comment:          '#',
+				TrimLeadingSpace: true,
 			},
 		},
 		{
 			name: "test_success_without_comma_and_comment",
 			args: args{
 				csv: &CSV{
-					trimLeadingSpace: true,
+					TrimLeadingSpace: true,
 				},
 			},
 			want: &CSV{
-				comma:            ',',
-				comment:          '#',
-				trimLeadingSpace: true,
+				Comma:            ',',
+				Comment:          '#',
+				TrimLeadingSpace: true,
 			},
 		},
 	}
@@ -494,7 +460,7 @@ func TestCSV_readCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			strS, err := csv.readCSV(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -635,7 +601,7 @@ func TestCSV_parseToCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			csv.isTyped = tt.args.isTyped
 
@@ -732,7 +698,7 @@ func TestCSV_extractHeaderInformation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt := csv.extractHeaderInformation(tt.args.names, tt.args.types)
 
@@ -858,7 +824,7 @@ func TestCSV_csvToMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt, err := csv.csvToMap(tt.args.headerInfo, tt.args.records)
 			if err != nil {
@@ -872,7 +838,7 @@ func TestCSV_csvToMap(t *testing.T) {
 	}
 }
 
-func TestToTyped(t *testing.T) {
+func TestCSV_toTyped(t *testing.T) {
 	type args struct {
 		value, format string
 		isPointerType bool
@@ -1135,7 +1101,7 @@ func TestToTyped(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
+			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt, err := csv.toTyped(tt.args.value, tt.args.format, tt.args.isPointerType)
 			if (err != nil) != tt.wantErr {
@@ -1144,53 +1110,6 @@ func TestToTyped(t *testing.T) {
 
 			if !reflect.DeepEqual(rslt, tt.want) {
 				t.Errorf("TestToTyped() is not equal. \ngot = %+#v\nwant = %+#v", rslt, tt.want)
-			}
-		})
-	}
-}
-
-func TestCSV_WithSkipEmptyTypeColumn(t *testing.T) {
-	type args struct {
-		skip bool
-	}
-	tests := []struct {
-		name string
-		args args
-		want *CSV
-	}{
-		{
-			name: "with_true",
-			args: args{
-				skip: true,
-			},
-			want: &CSV{
-				skipEmptyColumns: true,
-			},
-		},
-		{
-			name: "with_false",
-			args: args{
-				skip: false,
-			},
-			want: &CSV{
-				skipEmptyColumns: false,
-			},
-		},
-		{
-			name: "with_default",
-			args: args{},
-			want: &CSV{
-				skipEmptyColumns: false,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			csv := NewCSV(',', '#', true)
-			csv.WithSkipEmptyTypeColumn(tt.args.skip)
-
-			if !reflect.DeepEqual(csv.skipEmptyColumns, tt.want.skipEmptyColumns) {
-				t.Errorf("CSV.WithSkipEmptyTypeColumn() is not equal.\ngot = %v\nwant %v", csv.skipEmptyColumns, tt.want.skipEmptyColumns)
 			}
 		})
 	}
