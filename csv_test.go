@@ -169,7 +169,7 @@ func TestCSV_ToMap(t *testing.T) {
 			args: args{
 				data: []byte(`
 				foo,bar
-				
+
 				# third,fourth`),
 				withSkipEmpty: false,
 			},
@@ -274,18 +274,16 @@ func TestCSV_ToTypedMap(t *testing.T) {
 			want: []map[string]interface{}{
 				{
 					"foo": "first",
-					"bar": 10,
+					"bar": int(10),
 					"subtype": map[string]interface{}{
-						"key": 10,
+						"key": float64(10),
 					},
 				},
 			},
 			wantErr: false,
 		},
-		// []map[string]interface {}{map[string]interface {}{"bar":10, "foo":"first", "subtype":map[string]interface {}{"key":10}}}
-		// []map[string]interface {}{map[string]interface {}{"bar":10, "foo":"first", "subtype":map[string]interface {}{"key":10}}}
 		{
-			name: "test_typed_empty_column",
+			name: "test_typed_empty_row",
 			args: args{
 				data: []byte(`
 				foo,bar
@@ -325,7 +323,7 @@ func TestCSV_ToTypedMap(t *testing.T) {
 				data: []byte(`
 				foo,placeholder,bar
 				string,,int64
-				
+
 				first,test,10`),
 				skipEmptyColumns: true,
 			},
@@ -349,7 +347,7 @@ func TestCSV_ToTypedMap(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(rslt, tt.want) {
-				t.Errorf("TestToTypedMap() is not equal. got = %+#v, want = %+#v", rslt, tt.want)
+				t.Errorf("TestToTypedMap() is not equal.\ngot  = %#v\nwant = %#v", rslt, tt.want)
 			}
 		})
 	}
