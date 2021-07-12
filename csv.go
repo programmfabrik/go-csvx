@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -395,7 +396,9 @@ func (c *CSV) toTyped(value, format string, isPointer bool) (interface{}, error)
 		}
 
 		if isPointer {
-			return &data, nil
+			p := reflect.New(reflect.TypeOf(data))
+			p.Elem().Set(reflect.ValueOf(data))
+			return p.Interface(), nil
 		}
 
 		return data, nil

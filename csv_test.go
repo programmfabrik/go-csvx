@@ -1,7 +1,6 @@
 package csvx
 
 import (
-	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -259,13 +258,9 @@ func TestCSV_Typed(t *testing.T) {
 			},
 			want: []map[string]interface{}{
 				{
-					"foo": func(msg string) *string { return &msg }("first"),
-					"bar": func(i int) *int { return &i }(int(10)),
-					"subtype": func(str string) interface{} {
-						var data interface{}
-						_ = json.Unmarshal([]byte(str), &data)
-						return &data
-					}(`{"key": 10}`),
+					"foo":     func(msg string) *string { return &msg }("first"),
+					"bar":     func(i int) *int { return &i }(int(10)),
+					"subtype": &map[string]interface{}{"key": float64(10)},
 				},
 			},
 			wantErr: false,
@@ -1080,11 +1075,7 @@ func TestCSV_toTyped(t *testing.T) {
 				format:        "json",
 				isPointerType: true,
 			},
-			want: func(str string) interface{} {
-				var data interface{}
-				_ = json.Unmarshal([]byte(str), &data)
-				return &data
-			}(`{"name": "value"}`),
+			want:    &map[string]interface{}{"name": "value"},
 			wantErr: false,
 		},
 
