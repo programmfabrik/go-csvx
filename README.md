@@ -68,7 +68,7 @@ import (
 )
 
 func main() {
-    csv := csvx.CSV{
+    csv := csvx.CSVParser{
         Comma:            ',',
         Comment:          '#',
         TrimLeadingSpace: true,
@@ -102,7 +102,7 @@ import (
 )
 
 func main() {
-    csv := csvx.CSV{
+    csv := csvx.CSVParser{
         Comma:            ',',
         Comment:          '#',
         TrimLeadingSpace: true,

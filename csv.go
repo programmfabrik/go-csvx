@@ -26,7 +26,7 @@ type field struct {
 	Type string
 }
 
-type CSV struct {
+type CSVParser struct {
 	// Comma defines the rune with which the entries in the csv file are separated from each other.
 	Comma rune
 	// Comment defines the rune used to mark comment strings within the CSV.
@@ -41,7 +41,7 @@ type CSV struct {
 }
 
 // Untyped unmarshals the data into a slice of map[string]interface{}
-func (c *CSV) Untyped(data []byte) ([]map[string]interface{}, error) {
+func (c *CSVParser) Untyped(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = false
 	return c.parseToCSV(data)
 }
@@ -49,7 +49,7 @@ func (c *CSV) Untyped(data []byte) ([]map[string]interface{}, error) {
 // Typed unmarshals the typed data into a slice of map[string]interface{}
 //
 // In this case, the second column of the csv must contain the field types, otherwise it will throw an error
-func (c *CSV) Typed(data []byte) ([]map[string]interface{}, error) {
+func (c *CSVParser) Typed(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = true
 	return c.parseToCSV(data)
 }
@@ -60,7 +60,7 @@ func (c *CSV) Typed(data []byte) ([]map[string]interface{}, error) {
 // Default values:
 //  comma: ','
 //  comment: '#'
-func (c *CSV) checkForNilOrDefault() {
+func (c *CSVParser) checkForNilOrDefault() {
 	if c.Comma == *new(rune) {
 		c.Comma = ','
 	}
@@ -71,7 +71,7 @@ func (c *CSV) checkForNilOrDefault() {
 }
 
 // readCSV delegates the read command to csv.NewReader (stdlib) and writes it to a two-dimensional string slice that is returned.
-func (c *CSV) readCSV(data []byte) ([][]string, error) {
+func (c *CSVParser) readCSV(data []byte) ([][]string, error) {
 	csvR := csv.NewReader(bytes.NewReader(data))
 	csvR.Comma = c.Comma
 	csvR.Comment = c.Comment
@@ -88,7 +88,7 @@ func (c *CSV) readCSV(data []byte) ([][]string, error) {
 }
 
 // parseToCSV extracts the header information from the byte slice and generates a map based on the format (typed or untyped).
-func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
+func (c *CSVParser) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 	c.checkForNilOrDefault()
 
 	records, err := c.readCSV(data)
@@ -117,7 +117,7 @@ func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 }
 
 // extractHeaderInformation reads the header information and returns it as map of field
-func (c *CSV) extractHeaderInformation(names, types []string) map[int]field {
+func (c *CSVParser) extractHeaderInformation(names, types []string) map[int]field {
 	headFields := map[int]field{}
 
 	// extract field names
@@ -138,7 +138,7 @@ func (c *CSV) extractHeaderInformation(names, types []string) map[int]field {
 }
 
 // csvToMap builds the data columns based on the typed or untyped fields
-func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[string]interface{}, error) {
+func (c *CSVParser) csvToMap(headerInfo map[int]field, records [][]string) ([]map[string]interface{}, error) {
 	rslt := []map[string]interface{}{}
 
 	// skip first row
@@ -198,7 +198,7 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 }
 
 // toTyped takes the value and the format and converts the value into the desired format.
-func (c *CSV) toTyped(value, format string, isPointer bool) (interface{}, error) {
+func (c *CSVParser) toTyped(value, format string, isPointer bool) (interface{}, error) {
 	switch format {
 	case "string":
 		if value == "" && !isPointer {

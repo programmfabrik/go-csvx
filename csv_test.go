@@ -146,7 +146,7 @@ func TestCSV_Untyped(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.withSkipEmpty}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.withSkipEmpty}
 
 			rslt, err := csv.Untyped(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -322,7 +322,7 @@ func TestCSV_Typed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.skipEmptyColumns}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true, SkipEmptyColumns: tt.args.skipEmptyColumns}
 
 			rslt, err := csv.Typed(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -338,23 +338,23 @@ func TestCSV_Typed(t *testing.T) {
 
 func TestCSV_checkForNilOrDefault(t *testing.T) {
 	type args struct {
-		csv *CSV
+		csv *CSVParser
 	}
 	tests := []struct {
 		name string
 		args args
-		want *CSV
+		want *CSVParser
 	}{
 		{
 			name: "test_success_with_comma_and_comment",
 			args: args{
-				csv: &CSV{
+				csv: &CSVParser{
 					Comma:            ',',
 					Comment:          '#',
 					TrimLeadingSpace: true,
 				},
 			},
-			want: &CSV{
+			want: &CSVParser{
 				Comma:            ',',
 				Comment:          '#',
 				TrimLeadingSpace: true,
@@ -363,12 +363,12 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 		{
 			name: "test_success_with_comment",
 			args: args{
-				csv: &CSV{
+				csv: &CSVParser{
 					Comment:          '#',
 					TrimLeadingSpace: true,
 				},
 			},
-			want: &CSV{
+			want: &CSVParser{
 				Comma:            ',',
 				Comment:          '#',
 				TrimLeadingSpace: true,
@@ -377,12 +377,12 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 		{
 			name: "test_success_with_comma",
 			args: args{
-				csv: &CSV{
+				csv: &CSVParser{
 					Comma:            ',',
 					TrimLeadingSpace: true,
 				},
 			},
-			want: &CSV{
+			want: &CSVParser{
 				Comma:            ',',
 				Comment:          '#',
 				TrimLeadingSpace: true,
@@ -391,11 +391,11 @@ func TestCSV_checkForNilOrDefault(t *testing.T) {
 		{
 			name: "test_success_without_comma_and_comment",
 			args: args{
-				csv: &CSV{
+				csv: &CSVParser{
 					TrimLeadingSpace: true,
 				},
 			},
-			want: &CSV{
+			want: &CSVParser{
 				Comma:            ',',
 				Comment:          '#',
 				TrimLeadingSpace: true,
@@ -455,7 +455,7 @@ func TestCSV_readCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			strS, err := csv.readCSV(tt.args.data)
 			if (err != nil) != tt.wantErr {
@@ -596,7 +596,7 @@ func TestCSV_parseToCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			csv.isTyped = tt.args.isTyped
 
@@ -693,7 +693,7 @@ func TestCSV_extractHeaderInformation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt := csv.extractHeaderInformation(tt.args.names, tt.args.types)
 
@@ -819,7 +819,7 @@ func TestCSV_csvToMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt, err := csv.csvToMap(tt.args.headerInfo, tt.args.records)
 			if err != nil {
@@ -1092,7 +1092,7 @@ func TestCSV_toTyped(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			csv := CSV{Comma: ',', Comment: '#', TrimLeadingSpace: true}
+			csv := CSVParser{Comma: ',', Comment: '#', TrimLeadingSpace: true}
 
 			rslt, err := csv.toTyped(tt.args.value, tt.args.format, tt.args.isPointerType)
 			if (err != nil) != tt.wantErr {
