@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -25,31 +26,30 @@ type field struct {
 	Type string
 }
 
-type CSV struct {
-	comma, comment   rune
-	trimLeadingSpace bool
-
+type CSVParser struct {
+	// Comma defines the rune with which the entries in the csv file are separated from each other.
+	Comma rune
+	// Comment defines the rune used to mark comment strings within the CSV.
+	// If the line starts with this rune, the whole line is ignored.
+	Comment rune
+	// TrimLeadingSpace specifies whether leading spaces should be trimmed or not.
+	TrimLeadingSpace bool
+	// SkipEmptyColumns defines whether empty rows should be ignored or not.
+	SkipEmptyColumns bool
+	// isTyped defines whether the user expected to receive a typed or untyped response.
 	isTyped bool
 }
 
-func NewCSV(comma, comment rune, trimLeadingSpace bool) *CSV {
-	return &CSV{
-		comma:            comma,
-		comment:          comment,
-		trimLeadingSpace: trimLeadingSpace,
-	}
-}
-
-// ToMap unmarshals the data into a slice of map[string]interface{}
-func (c *CSV) ToMap(data []byte) ([]map[string]interface{}, error) {
+// Untyped unmarshals the data into a slice of map[string]interface{}
+func (c *CSVParser) Untyped(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = false
 	return c.parseToCSV(data)
 }
 
-// ToTypedMap unmarshals the typed data into a slice of map[string]interface{}
+// Typed unmarshals the typed data into a slice of map[string]interface{}
 //
 // In this case, the second column of the csv must contain the field types, otherwise it will throw an error
-func (c *CSV) ToTypedMap(data []byte) ([]map[string]interface{}, error) {
+func (c *CSVParser) Typed(data []byte) ([]map[string]interface{}, error) {
 	c.isTyped = true
 	return c.parseToCSV(data)
 }
@@ -60,21 +60,24 @@ func (c *CSV) ToTypedMap(data []byte) ([]map[string]interface{}, error) {
 // Default values:
 //  comma: ','
 //  comment: '#'
-func (c *CSV) checkForNilOrDefault() {
-	if c.comma == *new(rune) {
-		c.comma = ','
+func (c *CSVParser) checkForNilOrDefault() {
+	if c.Comma == *new(rune) {
+		c.Comma = ','
 	}
 
-	if c.comment == *new(rune) {
-		c.comment = '#'
+	if c.Comment == *new(rune) {
+		c.Comment = '#'
 	}
 }
 
-func (c *CSV) readCSV(data []byte) ([][]string, error) {
+// readCSV delegates the read command to csv.NewReader (stdlib) and writes it to a two-dimensional string slice that is returned.
+func (c *CSVParser) readCSV(data []byte) ([][]string, error) {
 	csvR := csv.NewReader(bytes.NewReader(data))
-	csvR.Comma = c.comma
-	csvR.Comment = c.comment
-	csvR.TrimLeadingSpace = c.trimLeadingSpace
+	csvR.Comma = c.Comma
+	csvR.Comment = c.Comment
+	csvR.TrimLeadingSpace = c.TrimLeadingSpace
+	csvR.FieldsPerRecord = -1
+	csvR.LazyQuotes = true
 
 	records, err := csvR.ReadAll()
 	if err != nil {
@@ -84,7 +87,8 @@ func (c *CSV) readCSV(data []byte) ([][]string, error) {
 	return records, nil
 }
 
-func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
+// parseToCSV extracts the header information from the byte slice and generates a map based on the format (typed or untyped).
+func (c *CSVParser) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 	c.checkForNilOrDefault()
 
 	records, err := c.readCSV(data)
@@ -98,31 +102,33 @@ func (c *CSV) parseToCSV(data []byte) ([]map[string]interface{}, error) {
 			return nil, ErrDataIsNil
 		}
 
-		headerInfo = c.extractHeaderInformations([2][]string{records[0], records[1]})
+		headerInfo = c.extractHeaderInformation(records[0], records[1])
 		records = records[2:]
 	} else {
 		if len(records) < 1 {
 			return nil, ErrDataIsNil
 		}
 
-		headerInfo = c.extractHeaderInformations([2][]string{records[0]})
+		headerInfo = c.extractHeaderInformation(records[0], nil)
 		records = records[1:]
 	}
 
 	return c.csvToMap(headerInfo, records)
 }
 
-// extractHeaderInformations reads the header information and returns it as map of field
-func (c *CSV) extractHeaderInformations(data [2][]string) map[int]field {
+// extractHeaderInformation reads the header information and returns it as map of field
+func (c *CSVParser) extractHeaderInformation(names, types []string) map[int]field {
 	headFields := map[int]field{}
 
-	for idx, value := range data[0] {
+	// extract field names
+	for idx, value := range names {
 		headFields[idx] = field{
 			Name: value,
 		}
 	}
 
-	for idx, value := range data[1] {
+	// extract field types
+	for idx, value := range types {
 		field := headFields[idx]
 		field.Type = value
 		headFields[idx] = field
@@ -131,12 +137,14 @@ func (c *CSV) extractHeaderInformations(data [2][]string) map[int]field {
 	return headFields
 }
 
-// csvToMap build the data columns based on the typed or untyped fields
-func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[string]interface{}, error) {
+// csvToMap builds the data columns based on the typed or untyped fields
+func (c *CSVParser) csvToMap(headerInfo map[int]field, records [][]string) ([]map[string]interface{}, error) {
 	rslt := []map[string]interface{}{}
 
 	// skip first row
 	for _, value := range records {
+		skipColumn := true
+
 		myColumn := make(map[string]interface{})
 		for idx, v2 := range value {
 			if len(headerInfo) < idx {
@@ -144,52 +152,121 @@ func (c *CSV) csvToMap(headerInfo map[int]field, records [][]string) ([]map[stri
 				break
 			}
 
-			// is typed
+			// checks if the first entry of the row and the first character of the string matches the comment character.
+			// If it matches, this row is skipped.
+			// This is necessary because csvR.ReadAll() ignores some cases that contain such a comment rune
+			if idx == 0 && len(v2) > 0 {
+				if rune(v2[0]) == c.Comment {
+					// the column contains the comment rune, skip it
+					break
+				}
+			}
+
+			// check whether v2 contains a value or not
+			// set skip column to false, if a value was set
+			if len(v2) > 0 {
+				skipColumn = false
+			}
+
+			// check whether isTyped is true, the header info is not set and skip columns is set
+			// then this row should be skipped
+			if c.isTyped && headerInfo[idx].Type == "" && c.SkipEmptyColumns {
+				continue
+			}
+
+			// check whether the type was set for the row
 			if headerInfo[idx].Type != "" {
-				// is typed
-				typed, err := c.toTyped(v2, headerInfo[idx].Type)
+				// toTyped returns the
+				typed, err := c.toTyped(v2, strings.TrimPrefix(headerInfo[idx].Type, "*"), strings.HasPrefix(headerInfo[idx].Type, "*"))
 				if err != nil {
 					return nil, err
 				}
+
+				// type is not a pointer
 				myColumn[headerInfo[idx].Name] = typed
 				continue
 			}
 
 			myColumn[headerInfo[idx].Name] = v2
 		}
-		rslt = append(rslt, myColumn)
+		if !skipColumn {
+			rslt = append(rslt, myColumn)
+		}
 	}
 
 	return rslt, nil
 }
 
-func (c *CSV) toTyped(value, format string) (interface{}, error) {
+// toTyped takes the value and the format and converts the value into the desired format.
+func (c *CSVParser) toTyped(value, format string, isPointer bool) (interface{}, error) {
 	switch format {
 	case "string":
+		if value == "" && !isPointer {
+			return "", nil
+		} else if value == "" && isPointer {
+			return nil, nil
+		}
+
+		if isPointer {
+			return &value, nil
+		}
+
 		return value, nil
 	case "int64":
-		if value == "" {
+		if value == "" && !isPointer {
 			return int64(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseInt(value, 10, 64)
+
+		val, err := strconv.ParseInt(value, 10, 64)
+		if isPointer {
+			return &val, err
+		}
+
+		return val, err
 	case "int":
-		if value == "" {
+		if value == "" && !isPointer {
 			return int(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.Atoi(value)
+
+		val, err := strconv.Atoi(value)
+		if isPointer {
+			return &val, err
+		}
+
+		return val, err
 	case "float64":
-		if value == "" {
+		if value == "" && !isPointer {
 			return float64(0), nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseFloat(value, 64)
+
+		val, err := strconv.ParseFloat(value, 64)
+		if isPointer {
+			return &val, err
+		}
+		return val, err
 	case "bool":
-		if value == "" {
+		if value == "" && !isPointer {
 			return false, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
-		return strconv.ParseBool(value)
+
+		val, err := strconv.ParseBool(value)
+		if isPointer {
+			return &val, err
+		}
+		return val, err
 	case "string,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []string{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -205,10 +282,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 
 		retArray := make([]string, 0)
 		retArray = append(retArray, records[0]...)
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "int64,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []int64{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -232,10 +316,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 			}
 			retArray = append(retArray, vi)
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "float64,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []float64{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -260,10 +351,17 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 			}
 			retArray = append(retArray, vi)
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "bool,array":
-		if value == "" {
+		if value == "" && !isPointer {
 			return []bool{}, nil
+		} else if value == "" && isPointer {
+			return nil, nil
 		}
 
 		records, err := c.readCSV([]byte(value))
@@ -280,16 +378,29 @@ func (c *CSV) toTyped(value, format string) (interface{}, error) {
 		for _, v := range records[0] {
 			retArray = append(retArray, strings.TrimSpace(v) == "true")
 		}
+
+		if isPointer {
+			return &retArray, nil
+		}
+
 		return retArray, nil
 	case "json":
 		if value == "" {
 			return nil, nil
 		}
+
 		var data interface{}
 		err := json.Unmarshal([]byte(value), &data)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInEmbeddedJSON, err)
 		}
+
+		if isPointer {
+			p := reflect.New(reflect.TypeOf(data))
+			p.Elem().Set(reflect.ValueOf(data))
+			return p.Interface(), nil
+		}
+
 		return data, nil
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrUnsupportedType, format)
